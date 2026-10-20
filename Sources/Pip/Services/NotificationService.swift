@@ -16,7 +16,9 @@ final class NotificationService {
 
     func requestAuthorizationIfNeeded() {
         guard available, prefs.notifyLow || prefs.notifyReset || prefs.notifyDisconnect else { return }
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        // The async form: a completion closure written here would be main-actor
+        // isolated, and the system calls it on a background queue, which traps.
+        Task { _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) }
     }
 
     func handle(_ event: UsageEvent, coordinator: UsageCoordinator) {

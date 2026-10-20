@@ -226,12 +226,16 @@ struct TouchBarStrip: View {
     private func nameLabel(_ name: String) -> some View {
         let nsFont = prefs.style == .type ? NSFont.monospacedSystemFont(ofSize: 12, weight: .regular) : NSFont.systemFont(ofSize: 12)
         let attributed = NSAttributedString(string: name, attributes: [.font: nsFont, .foregroundColor: NSColor(fg)])
+        return Image(nsImage: Self.textImage(attributed)).accessibilityHidden(true)
+    }
+
+    /// Not main-actor isolated: AppKit may run the drawing handler on another thread.
+    nonisolated private static func textImage(_ attributed: NSAttributedString) -> NSImage {
         let size = attributed.size()
-        let image = NSImage(size: NSSize(width: ceil(size.width), height: ceil(size.height)), flipped: false) { _ in
+        return NSImage(size: NSSize(width: ceil(size.width), height: ceil(size.height)), flipped: false) { _ in
             attributed.draw(at: .zero)
             return true
         }
-        return Image(nsImage: image).accessibilityHidden(true)
     }
 
     /// One provider's box: dot, full name and its usage as a small Pip (or
