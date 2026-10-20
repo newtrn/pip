@@ -35,6 +35,9 @@ final class SnapshotRenderer: NSObject, NSApplicationDelegate {
     }
 
     private func renderAll() {
+        // The README logo: a happy, mostly full Pip on a transparent background.
+        render(SlimeView(mood: .healthy, level: 0.82, size: 160, style: .color(mood: .healthy, remaining: 82, hue: 45, dark: false), fps: nil)
+                .padding(16), "logo", dark: false, transparent: true)
         for dark in [false, true] {
             let tag = dark ? "dark" : "light"
             for style in PipStyle.allCases {
@@ -104,8 +107,8 @@ final class SnapshotRenderer: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func render<V: View>(_ view: V, _ name: String, dark: Bool) {
-        let bg = dark ? Color(rgba: 30, 30, 32) : Color(hex: 0xE6E4DF)
+    private func render<V: View>(_ view: V, _ name: String, dark: Bool, transparent: Bool = false) {
+        let bg = transparent ? Color.clear : dark ? Color(rgba: 30, 30, 32) : Color(hex: 0xE6E4DF)
         let renderer = ImageRenderer(content: view.background(bg).environment(\.colorScheme, dark ? .dark : .light))
         renderer.scale = 2
         guard let image = renderer.nsImage, let tiff = image.tiffRepresentation,
