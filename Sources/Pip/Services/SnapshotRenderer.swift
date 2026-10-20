@@ -35,6 +35,9 @@ final class SnapshotRenderer: NSObject, NSApplicationDelegate {
     }
 
     private func renderAll() {
+        // The app icon master (scripts/make-icon.sh turns it into AppIcon.icns):
+        // Pip on a warm macOS-style rounded square, at 1024 px.
+        render(AppIconArt().frame(width: 512, height: 512), "AppIcon", dark: false, transparent: true)
         // The README logo: a happy, mostly full Pip on a transparent background.
         render(SlimeView(mood: .healthy, level: 0.82, size: 160, style: .color(mood: .healthy, remaining: 82, hue: 45, dark: false), fps: nil)
                 .padding(16), "logo", dark: false, transparent: true)
@@ -136,5 +139,20 @@ private struct MenuBarSample: View {
         local.iconColor = prefs.iconColor
         return MenuBarItemView(coordinator: coordinator, prefs: local, motion: motion)
             .background(RoundedRectangle(cornerRadius: 5).fill(Color.primary.opacity(0.06)))
+    }
+}
+
+/// Pip on the app icon tile. Drawn at 512 pt (1024 px at 2x) with the standard
+/// macOS margin, so the tile is 824 px of the 1024 px canvas.
+private struct AppIconArt: View {
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 92, style: .continuous)
+                .fill(LinearGradient(colors: [Color(hex: 0xFBF7F1), Color(hex: 0xEADFD1)], startPoint: .top, endPoint: .bottom))
+                .shadow(color: .black.opacity(0.22), radius: 10, y: 6)
+            SlimeView(mood: .healthy, level: 0.82, size: 300, style: .color(mood: .healthy, remaining: 82, hue: 45, dark: false), fps: nil)
+                .offset(y: 8)
+        }
+        .frame(width: 412, height: 412)
     }
 }
