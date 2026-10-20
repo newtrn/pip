@@ -1,0 +1,42 @@
+# Push a tag like v0.2.0 to publish a release. The Homebrew tap
+# (newtrn/homebrew-tap) picks up the new zip on its next scheduled check.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test
+        run: swift test
+      - name: Build universal app
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          UNIVERSAL=1 VERSION=$VERSION BUILD_NUMBER=$GITHUB_RUN_NUMBER scripts/build-app.sh
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHA=$(shasum -a 256 build/Pip-$VERSION.zip | cut -d' ' -f1)
+          cat > notes.md <<NOTES
+          Install with Homebrew:
+
+          \`\`\`sh
+          brew install --cask newtrn/tap/pip
+          \`\`\`
+
+          Or download **Pip-$VERSION.zip**, unzip it and move Pip.app to Applications.
+
+          Pip isn't notarized yet. The first time you open it, macOS says it can't verify the developer: open **System Settings → Privacy & Security** and click **Open Anyway**.
+
+          SHA-256: \`$SHA\`
+          NOTES
+          gh release create "$GITHUB_REF_NAME" "build/Pip-$VERSION.zip" --title "Pip $VERSION" --notes-file notes.md

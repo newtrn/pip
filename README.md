@@ -54,6 +54,19 @@ Quotas, API spend and credits are kept as separate kinds of numbers and never mi
 - Reduce Motion is respected. Animation can also be turned off in Settings.
 - It follows light and dark mode, and every element has a VoiceOver label.
 
+## Install
+
+```sh
+brew install --cask newtrn/tap/pip
+```
+
+Or download the zip from [Releases](https://github.com/newtrn/pip/releases/latest), unzip it and move Pip.app to Applications.
+
+> [!IMPORTANT]
+> Pip isn't notarized by Apple yet. The first time you open it, macOS says it can't verify the developer. Open **System Settings → Privacy & Security**, scroll down and click **Open Anyway**. You only need to do this once.
+
+Pip has no Dock icon. Look for it in the menu bar. Open the app again to bring up Settings, then go to **Providers → Connect…** to switch a provider from demo data to your real account.
+
 ## Requirements
 
 - macOS 13 Ventura or later
@@ -68,7 +81,7 @@ scripts/build-app.sh      # builds build/Pip.app
 open build/Pip.app
 ```
 
-Pip has no Dock icon. Look for it in the menu bar. Open the app again to bring up Settings, then go to **Providers → Connect…** to switch a provider from demo data to your real account.
+`UNIVERSAL=1 VERSION=x.y.z scripts/build-app.sh` builds for Apple silicon and Intel and zips the result. Pushing a `vX.Y.Z` tag runs the same build on GitHub Actions and publishes a release.
 
 ### Development
 
@@ -85,6 +98,10 @@ More detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/PLAN.md](doc
 - Pip has no server and no analytics.
 - API keys are stored in your login keychain and sent only to the provider they belong to.
 - Pip never renews or changes the Claude Code or Codex sign-in.
+
+## License
+
+[MIT](LICENSE)
 
 ---
 
