@@ -18,6 +18,10 @@ public struct ClaudeCodeProvider: UsageProvider {
     public var minimumRefreshInterval: TimeInterval { 180 }
     let client: HTTPClient
     let readCredentials: @Sendable () -> Data?
+    /// The last login read from the keychain. Each read can raise the system's
+    /// permission prompt, so it is read again only once the token expires or is
+    /// rejected, which is when Claude Code would have renewed it.
+    private let cache = LoginCache()
 
     static let usageURL = URL(string: "https://api.anthropic.com/api/oauth/usage")!
     /// The edge rejects requests whose User-Agent isn't Claude Code's.
@@ -60,12 +64,15 @@ public struct ClaudeCodeProvider: UsageProvider {
     }
 
     public func fetchUsage(now: Date) async throws -> ProviderSnapshot {
-        guard let raw = readCredentials(),
-              let oauth = try? JSONDecoder().decode(Credentials.self, from: raw).claudeAiOauth,
-              let token = oauth.accessToken, !token.isEmpty else {
+        var oauth = cache.get()
+        if oauth == nil || Self.isExpired(oauth!, now: now) {
+            oauth = readCredentials().flatMap { try? JSONDecoder().decode(Credentials.self, from: $0).claudeAiOauth }
+            cache.set(oauth)
+        }
+        guard let oauth, let token = oauth.accessToken, !token.isEmpty else {
             throw ProviderError.unsupported("Claude Code isn't signed in on this Mac")
         }
-        if let expires = oauth.expiresAt, expires / 1000 < now.timeIntervalSince1970 {
+        if Self.isExpired(oauth, now: now) {
             throw ProviderError.unsupported("Claude Code's sign-in expired. Open Claude Code to renew it")
         }
 
@@ -79,12 +86,17 @@ public struct ClaudeCodeProvider: UsageProvider {
         do {
             usage = try await HTTP.get(Usage.self, request, client: client)
         } catch ProviderError.unauthorized {
+            cache.set(nil)
             throw ProviderError.unsupported("No active Claude subscription, or the sign-in expired. Open Claude Code to renew it")
         }
 
         let metrics = Self.metrics(from: usage)
         guard !metrics.isEmpty else { throw ProviderError.unsupported("Claude didn't report any limits") }
         return ProviderSnapshot(provider: .claudeCode, plan: Self.plan(oauth), metrics: metrics, fetchedAt: now, isDemo: false)
+    }
+
+    static func isExpired(_ oauth: Credentials.OAuth, now: Date) -> Bool {
+        oauth.expiresAt.map { $0 / 1000 < now.timeIntervalSince1970 } ?? false
     }
 
     static func metrics(from usage: Usage) -> [UsageMetric] {
@@ -143,4 +155,12 @@ public struct ClaudeCodeProvider: UsageProvider {
             ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude")
         return try? Data(contentsOf: dir.appendingPathComponent(".credentials.json"))
     }
+}
+
+private final class LoginCache: @unchecked Sendable {
+    private let lock = NSLock()
+    private var oauth: ClaudeCodeProvider.Credentials.OAuth?
+
+    func get() -> ClaudeCodeProvider.Credentials.OAuth? { lock.withLock { oauth } }
+    func set(_ value: ClaudeCodeProvider.Credentials.OAuth?) { lock.withLock { oauth = value } }
 }

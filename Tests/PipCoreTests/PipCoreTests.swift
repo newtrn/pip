@@ -206,6 +206,33 @@ final class SubscriptionProviderTests: XCTestCase {
         }
     }
 
+    func testClaudeReadsKeychainOnlyWhenTokenExpiresOrIsRejected() async throws {
+        let body = #"{"limits":[{"kind":"session","percent":10}]}"#
+        let creds = #"{"claudeAiOauth":{"accessToken":"t","expiresAt":2000000000000}}"#
+        let reads = Counter()
+        let p = ClaudeCodeProvider(client: APIProviderTests.Stub(routes: ["/api/oauth/usage": (200, body)]),
+                                   readCredentials: { reads.bump(); return Data(creds.utf8) })
+        let now = Date(timeIntervalSince1970: 1_900_000_000)
+        _ = try await p.fetchUsage(now: now)
+        _ = try await p.fetchUsage(now: now)
+        XCTAssertEqual(reads.value, 1)
+        _ = try? await p.fetchUsage(now: Date(timeIntervalSince1970: 2_100_000_000))
+        XCTAssertEqual(reads.value, 2)
+
+        let rejected = ClaudeCodeProvider(client: APIProviderTests.Stub(routes: ["/api/oauth/usage": (401, "{}")]),
+                                          readCredentials: { reads.bump(); return Data(creds.utf8) })
+        _ = try? await rejected.fetchUsage(now: now)
+        _ = try? await rejected.fetchUsage(now: now)
+        XCTAssertEqual(reads.value, 4)
+    }
+
+    final class Counter: @unchecked Sendable {
+        private let lock = NSLock()
+        private var n = 0
+        var value: Int { lock.withLock { n } }
+        func bump() { lock.withLock { n += 1 } }
+    }
+
     func testCodexReadsNewestEventAndRollsPastResets() async throws {
         let home = FileManager.default.temporaryDirectory.appendingPathComponent("codex-\(UUID())")
         let now = Date()
