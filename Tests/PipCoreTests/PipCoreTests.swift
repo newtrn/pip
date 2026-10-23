@@ -198,6 +198,16 @@ final class SubscriptionProviderTests: XCTestCase {
         XCTAssertEqual(snap.plan, "Pro plan")
     }
 
+    func testClaudePlanNames() throws {
+        func plan(_ json: String) throws -> String {
+            ClaudeCodeProvider.plan(try JSONDecoder().decode(ClaudeCodeProvider.Credentials.OAuth.self, from: Data(json.utf8)))
+        }
+        XCTAssertEqual(try plan(#"{"subscriptionType":"pro","rateLimitTier":"default_claude_ai"}"#), "Pro plan")
+        XCTAssertEqual(try plan(#"{"subscriptionType":"max","rateLimitTier":"default_claude_max_5x"}"#), "Max 5x plan")
+        XCTAssertEqual(try plan(#"{"rateLimitTier":"default_claude_max_20x"}"#), "Max 20x plan")
+        XCTAssertEqual(try plan("{}"), "Claude plan")
+    }
+
     func testClaudeExpiredTokenIsNotRefreshed() async {
         let creds = #"{"claudeAiOauth":{"accessToken":"t","expiresAt":1000}}"#
         let p = ClaudeCodeProvider(client: APIProviderTests.Stub(routes: [:]), readCredentials: { Data(creds.utf8) })

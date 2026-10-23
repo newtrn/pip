@@ -132,9 +132,14 @@ public struct ClaudeCodeProvider: UsageProvider {
         return f.date(from: s)
     }
 
-    /// "default_claude_max_20x" → "Max 20x plan", "pro" → "Pro plan".
+    /// "default_claude_max_20x" → "Max 20x plan", "pro" → "Pro plan". The tier only
+    /// adds detail when it names the subscription; Pro's tier is the generic
+    /// "default_claude_ai".
     static func plan(_ oauth: Credentials.OAuth) -> String {
-        let raw = oauth.rateLimitTier?.replacingOccurrences(of: "default_claude_", with: "") ?? oauth.subscriptionType ?? "Claude"
+        let tier = oauth.rateLimitTier?.replacingOccurrences(of: "default_claude_", with: "")
+        let raw: String
+        if let tier, let sub = oauth.subscriptionType, tier.hasPrefix(sub) { raw = tier }
+        else { raw = oauth.subscriptionType ?? tier ?? "Claude" }
         let words = raw.split(separator: "_").map { $0.prefix(1).uppercased() + $0.dropFirst() }
         return words.joined(separator: " ") + " plan"
     }
