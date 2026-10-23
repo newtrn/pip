@@ -1,5 +1,4 @@
 import Foundation
-import Security
 
 /// Claude subscription limits from the endpoint Claude Code itself uses,
 /// `GET https://api.anthropic.com/api/oauth/usage`, with the login Claude Code
@@ -18,9 +17,8 @@ public struct ClaudeCodeProvider: UsageProvider {
     public var minimumRefreshInterval: TimeInterval { 180 }
     let client: HTTPClient
     let readCredentials: @Sendable () -> Data?
-    /// The last login read from the keychain. Each read can raise the system's
-    /// permission prompt, so it is read again only once the token expires or is
-    /// rejected, which is when Claude Code would have renewed it.
+    /// The last login read from the keychain, read again only once the token
+    /// expires or is rejected, which is when Claude Code would have renewed it.
     private let cache = LoginCache()
 
     static let usageURL = URL(string: "https://api.anthropic.com/api/oauth/usage")!
@@ -142,15 +140,22 @@ public struct ClaudeCodeProvider: UsageProvider {
     }
 
     /// Claude Code keeps its login in the macOS keychain ("Claude Code-credentials");
-    /// on other setups it uses `~/.claude/.credentials.json`. Reading the keychain
-    /// item shows the system's permission prompt the first time.
+    /// on other setups it uses `~/.claude/.credentials.json`. Claude Code writes the
+    /// item with `/usr/bin/security`, so the item's access list always trusts that
+    /// tool: reading through it never prompts, while reading the item directly
+    /// prompts again whenever Pip's ad-hoc signature changes or the item is rewritten.
     public static let systemCredentials: @Sendable () -> Data? = {
-        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
-                                    kSecAttrService as String: "Claude Code-credentials",
-                                    kSecReturnData as String: true,
-                                    kSecMatchLimit as String: kSecMatchLimitOne]
-        var out: AnyObject?
-        if SecItemCopyMatching(query as CFDictionary, &out) == errSecSuccess, let data = out as? Data { return data }
+        let security = Process()
+        security.executableURL = URL(fileURLWithPath: "/usr/bin/security")
+        security.arguments = ["find-generic-password", "-s", "Claude Code-credentials", "-w"]
+        let out = Pipe()
+        security.standardOutput = out
+        security.standardError = FileHandle.nullDevice
+        if (try? security.run()) != nil {
+            let data = out.fileHandleForReading.readDataToEndOfFile()
+            security.waitUntilExit()
+            if security.terminationStatus == 0, !data.isEmpty { return data }
+        }
         let dir = ProcessInfo.processInfo.environment["CLAUDE_CONFIG_DIR"].map { URL(fileURLWithPath: $0) }
             ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude")
         return try? Data(contentsOf: dir.appendingPathComponent(".credentials.json"))

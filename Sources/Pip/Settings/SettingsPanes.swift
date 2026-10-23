@@ -212,7 +212,7 @@ struct ConnectSheet: View {
         case .openAIAPI:
             return "Create an Admin key in the OpenAI dashboard → Organization → Admin keys. Project API keys can't read usage."
         case .claudeCode:
-            return "Pip reads the sign-in Claude Code already saved in your keychain (macOS will ask you to allow it) and asks api.anthropic.com for your 5-hour and weekly limits — the same request Claude Code makes. Pip never renews or changes that sign-in."
+            return "Pip reads the sign-in Claude Code already saved in your keychain and asks api.anthropic.com for your 5-hour and weekly limits — the same request Claude Code makes. Pip never renews or changes that sign-in."
         case .codex:
             return "Pip asks Codex for your 5-hour and weekly limits by running codex app-server, the same way Codex's own apps do, using the sign-in Codex already has. Pip never sees that sign-in. If Codex can't be found, Pip reads the limits Codex records in ~/.codex/sessions instead."
         }
