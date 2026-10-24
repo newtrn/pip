@@ -5,6 +5,10 @@ public enum ProviderError: Error, Equatable, Sendable {
     case unauthorized
     case network(String)
     case unsupported(String)
+    /// The provider's own app needs to sign in again (for example Claude Code's
+    /// token expired). Nothing was sent; Pip checks again every minute and picks
+    /// the new sign-in up as soon as it appears.
+    case signInNeeded(String)
 
     public var userMessage: String {
         switch self {
@@ -12,6 +16,7 @@ public enum ProviderError: Error, Equatable, Sendable {
         case .unauthorized: return "The key was rejected"
         case .network(let m): return m
         case .unsupported(let m): return m
+        case .signInNeeded(let m): return m
         }
     }
 }

@@ -134,6 +134,15 @@ final class CoordinatorTests: XCTestCase {
         c.apply(.failure(ProviderError.network("x")), for: .claudeCode)
         if case .offline = c.status[.claudeCode] {} else { XCTFail("expected offline") }
     }
+
+    func testLapsedSignInIsTrackedUntilDataArrives() {
+        let c = makeCoordinator()
+        c.apply(.failure(ProviderError.signInNeeded("expired")), for: .claudeCode)
+        XCTAssertTrue(c.needsSignIn.contains(.claudeCode))
+        c.apply(.success(snap(used: 10, resetsAt: Date().addingTimeInterval(3600))), for: .claudeCode)
+        XCTAssertFalse(c.needsSignIn.contains(.claudeCode))
+        XCTAssertEqual(c.status[.claudeCode], .live)
+    }
 }
 
 /// Parsers checked against the example payloads in the official API references.
@@ -212,7 +221,8 @@ final class SubscriptionProviderTests: XCTestCase {
         let creds = #"{"claudeAiOauth":{"accessToken":"t","expiresAt":1000}}"#
         let p = ClaudeCodeProvider(client: APIProviderTests.Stub(routes: [:]), readCredentials: { Data(creds.utf8) })
         do { _ = try await p.fetchUsage(now: Date()); XCTFail() } catch {
-            XCTAssertTrue((error as? ProviderError)?.userMessage.contains("expired") == true)
+            guard case ProviderError.signInNeeded(let message)? = error as? ProviderError else { return XCTFail("\(error)") }
+            XCTAssertTrue(message.contains("expired"))
         }
     }
 

@@ -16,6 +16,9 @@ public final class UsageCoordinator: ObservableObject {
     @Published public private(set) var snapshots: [ProviderID: ProviderSnapshot] = [:]
     @Published public private(set) var status: [ProviderID: ConnectionStatus] = [:]
     @Published public private(set) var recovering: Set<ProviderID> = []
+    /// Providers whose app needs to sign in again. Checked every minute,
+    /// regardless of their usual minimum interval, since nothing is sent.
+    @Published public private(set) var needsSignIn: Set<ProviderID> = []
     /// Ticks every 30 s so countdowns stay current without per-second redraws.
     @Published public private(set) var now = Date()
 
@@ -80,7 +83,7 @@ public final class UsageCoordinator: ObservableObject {
     /// `force` is for the user's Refresh button; timers respect each provider's minimum interval.
     public func refresh(_ id: ProviderID, force: Bool = true) {
         guard let provider = providers[id], refreshTasks[id] == nil else { return }
-        if !force, let last = lastAttempt[id], Date().timeIntervalSince(last) < provider.minimumRefreshInterval { return }
+        if !force, !needsSignIn.contains(id), let last = lastAttempt[id], Date().timeIntervalSince(last) < provider.minimumRefreshInterval { return }
         lastAttempt[id] = Date()
         log.debug("refresh \(id.rawValue, privacy: .public) force=\(force)")
         if snapshots[id] == nil || status[id] == .live { status[id] = .loading }
@@ -102,12 +105,14 @@ public final class UsageCoordinator: ObservableObject {
             let previous = snapshots[id]
             snapshots[id] = snap
             status[id] = .live
+            needsSignIn.remove(id)
             failures[id] = 0
             detectReset(id, previous: previous, current: snap)
             detectLow(id, current: snap)
             cache.save(snapshots)
         case .failure(let error):
             log.notice("\(id.rawValue, privacy: .public) failed: \(String(describing: error), privacy: .public)")
+            if case ProviderError.signInNeeded = error { needsSignIn.insert(id) } else { needsSignIn.remove(id) }
             let count = (failures[id] ?? 0) + 1
             failures[id] = count
             if let snap = snapshots[id], count < 3 {
@@ -191,6 +196,7 @@ public final class UsageCoordinator: ObservableObject {
         status[id] = .loading
         failures[id] = 0
         lastAttempt[id] = nil
+        needsSignIn.remove(id)
         lastLowThreshold[id] = nil
         recovering.remove(id)
         cache.save(snapshots)

@@ -68,10 +68,10 @@ public struct ClaudeCodeProvider: UsageProvider {
             cache.set(oauth)
         }
         guard let oauth, let token = oauth.accessToken, !token.isEmpty else {
-            throw ProviderError.unsupported("Claude Code isn't signed in on this Mac")
+            throw ProviderError.signInNeeded("Claude Code isn't signed in on this Mac. Sign in to Claude Code and Pip will pick it up")
         }
         if Self.isExpired(oauth, now: now) {
-            throw ProviderError.unsupported("Claude Code's sign-in expired. Open Claude Code to renew it")
+            throw ProviderError.signInNeeded(Self.expiredMessage)
         }
 
         var request = URLRequest(url: Self.usageURL)
@@ -85,13 +85,17 @@ public struct ClaudeCodeProvider: UsageProvider {
             usage = try await HTTP.get(Usage.self, request, client: client)
         } catch ProviderError.unauthorized {
             cache.set(nil)
-            throw ProviderError.unsupported("No active Claude subscription, or the sign-in expired. Open Claude Code to renew it")
+            throw ProviderError.signInNeeded(Self.expiredMessage)
         }
 
         let metrics = Self.metrics(from: usage)
         guard !metrics.isEmpty else { throw ProviderError.unsupported("Claude didn't report any limits") }
         return ProviderSnapshot(provider: .claudeCode, plan: Self.plan(oauth), metrics: metrics, fetchedAt: now, isDemo: false)
     }
+
+    /// Claude Code renews its sign-in only while it runs, so it lapses after a
+    /// while away. Pip never renews it itself (see above).
+    static let expiredMessage = "Claude Code's sign-in has expired. Use Claude Code once to renew it, and Pip will update within a minute"
 
     static func isExpired(_ oauth: Credentials.OAuth, now: Date) -> Bool {
         oauth.expiresAt.map { $0 / 1000 < now.timeIntervalSince1970 } ?? false

@@ -176,6 +176,8 @@ struct PopoverView: View {
             switch s.mood {
             case .disconnected:
                 let reason: String = { if case .offline(let r) = s.status { return r }; return "retrying in a minute" }()
+                // A lapsed sign-in isn't a connection problem: say just what to do.
+                if s.needsSignIn { return ("\(reason).", Palette.warn.opacity(0.16), Color(oklch: 0.72, 0.15, 70)) }
                 return ("Couldn't reach \(name) · \(reason).", Palette.bad.opacity(0.14), Palette.bad)
             case .stale: return ("Showing data from \(s.staleMinutes) min ago — the last refresh failed.", Palette.warn.opacity(0.16), Color(oklch: 0.72, 0.15, 70))
             case .loading: return ("Connecting to \(name)…", pt.card, pt.sub)

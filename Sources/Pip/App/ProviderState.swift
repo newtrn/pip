@@ -7,6 +7,8 @@ struct ProviderState: Identifiable {
     let snapshot: ProviderSnapshot?
     let status: ConnectionStatus
     let recovering: Bool
+    /// The provider's app needs to sign in again; the source itself is fine.
+    let needsSignIn: Bool
     let now: Date
 
     var id: ProviderID { descriptor.id }
@@ -28,6 +30,7 @@ struct ProviderState: Identifiable {
     }
 
     func line(presenter: UsagePresenter) -> String {
+        if needsSignIn && mood == .disconnected { return "Waiting for \(descriptor.name) to sign back in." }
         let quota = snapshot?.primaryQuota
         return MascotVoice.line(mood, providerName: descriptor.name, remaining: remaining,
                                 resetAt: quota.map(presenter.resetAt) ?? "—",
@@ -39,6 +42,6 @@ struct ProviderState: Identifiable {
 extension UsageCoordinator {
     func state(_ id: ProviderID) -> ProviderState {
         ProviderState(descriptor: .of(id), snapshot: snapshots[id], status: status[id] ?? .loading,
-                      recovering: recovering.contains(id), now: now)
+                      recovering: recovering.contains(id), needsSignIn: needsSignIn.contains(id), now: now)
     }
 }
